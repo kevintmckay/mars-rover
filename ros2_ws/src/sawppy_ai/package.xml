@@ -4,7 +4,7 @@
   <name>sawppy_ai</name>
   <version>0.1.0</version>
   <description>AI-Link integration for offloading reasoning to Ollama server</description>
-  <maintainer email="kevin@localhost">Kevin</maintainer>
+  <maintainer email="kevin@example.com">Kevin</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>

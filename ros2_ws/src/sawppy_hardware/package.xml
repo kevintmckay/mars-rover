@@ -4,7 +4,7 @@
   <name>sawppy_hardware</name>
   <version>0.1.0</version>
   <description>LX-16A servo driver and hardware interface for Sawppy rover</description>
-  <maintainer email="kevin@localhost">Kevin</maintainer>
+  <maintainer email="kevin@example.com">Kevin</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>

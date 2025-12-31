@@ -4,7 +4,7 @@
   <name>sawppy_sensors</name>
   <version>0.1.0</version>
   <description>Sensor configurations and launch files for Sawppy rover (RPLidar, RealSense, BNO055)</description>
-  <maintainer email="kevin@localhost">Kevin</maintainer>
+  <maintainer email="kevin@example.com">Kevin</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
