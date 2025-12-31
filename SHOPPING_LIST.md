@@ -6,7 +6,7 @@
 |----------|-----------|
 | Servos & Control | $160 |
 | **Autonomy Sensors** | **$459** |
-| **Autonomy Electronics** | **$34** |
+| **Autonomy Electronics** | **$36** |
 | Electronics (misc) | $8 |
 | Power (misc) | $22 |
 | Aluminum Extrusions | $15-45 |
@@ -14,7 +14,7 @@
 | Hardware (inserts, brass screws, sleeve) | $30 |
 | 3D Printing Filament | $75 |
 | **BASE TOTAL** | **$358-388** |
-| **AUTONOMY TOTAL** | **$851-881** |
+| **AUTONOMY TOTAL** | **$853-883** |
 
 *Note: Excludes items already owned (Pi, LiPo, microSD, JST, Deans, M3 hardware)*
 
@@ -36,10 +36,10 @@
 
 | Qty | Item | Unit Price | Total | Link |
 |-----|------|------------|-------|------|
-| 1 | RPLidar A1 (12m 2D Lidar) | $99 | $99 | [Amazon](https://amzn.to/3RjqL9K) |
-| 1 | Intel RealSense D435 (Depth Camera) | $300 | $300 | [Intel Store](https://store.intelrealsense.com/buy-intel-realsense-depth-camera-d435.html) |
+| 1 | RPLidar A1 (12m 2D Lidar) | $99 | $99 | [Amazon](https://www.amazon.com/Stemedu-Distance-Developed-Omnidirectional-Scanning/dp/B07L89TT6F) |
+| 1 | Intel RealSense D435i (Depth Camera + IMU) | $300 | $300 | [Amazon](https://www.amazon.com/Intel-RealSense-Depth-Camera-D435i/dp/B07MWR2YJB) |
 | 1 | BNO055 IMU (9-axis) | $35 | $35 | [Adafruit](https://www.adafruit.com/product/2472) |
-| 1 | USB 3.0 Powered Hub (4-port) | $25 | $25 | [Amazon](https://amzn.to/3RqVzX2) |
+| 1 | USB 3.0 Powered Hub (4-port) | $25 | $25 | [Amazon](https://www.amazon.com/atolla-Charging-Splitter-Individual-Switches/dp/B083XTKV8V) |
 
 **Subtotal: ~$459**
 
@@ -49,12 +49,12 @@
 
 | Qty | Item | Unit Price | Total | Link |
 |-----|------|------------|-------|------|
-| 1 | USB-to-Serial CH340 (RPLidar) | $8 | $8 | [Amazon](https://amzn.to/3RnS9vP) |
-| 1 | DC-DC Buck 5V/5A (Pi 5 power) | $10 | $10 | [Amazon](https://amzn.to/3RqW8vN) |
-| 1 | DC-DC Buck 5V/3A (servo logic) | $8 | $8 | [Amazon](https://amzn.to/3RqX2mQ) |
-| 1 | INA219 Battery Monitor | $8 | $8 | [Amazon](https://amzn.to/3RpY4nR) |
+| 1 | USB-to-Serial CH340 (RPLidar) | $8 | $8 | [Amazon](https://www.amazon.com/HiLetgo-Module-Microcontroller-Download-Serial/dp/B00LZV1G6K) |
+| 1 | DC-DC Buck 5V/5A USB-C (Pi 5 power) | $12 | $12 | [Amazon](https://www.amazon.com/PlusRoc-Waterproof-Converter-Compatible-Raspberry/dp/B09DGDQ48H) |
+| 1 | DC-DC Buck 5V/3A (servo logic) | $8 | $8 | [Amazon](https://www.amazon.com/WGCD-DC-DC-Converter-Adjustable-Module/dp/B07KFVWYNW) |
+| 1 | INA219 Battery Monitor | $8 | $8 | [Amazon](https://www.amazon.com/HiLetgo-INA219-Bi-directional-Current-Breakout/dp/B01ICN5OAM) |
 
-**Subtotal: ~$34**
+**Subtotal: ~$36**
 
 ---
 
@@ -196,13 +196,13 @@ Order from: [Misumi HFS3 15x15mm](https://us.misumi-ec.com/vona2/detail/11030046
 - [x] ~~M3 hardware assortment~~ - *OWNED*
 - [ ] Cable sleeve - $10
 
-### Amazon - Autonomy Sensors (~$493)
+### Amazon - Autonomy Sensors (~$495)
 - [ ] RPLidar A1 (12m 2D Lidar) - $99
-- [ ] Intel RealSense D435 (or Amazon) - $300
+- [ ] Intel RealSense D435i (Depth + IMU) - $300
 - [ ] BNO055 IMU (or Adafruit) - $35
 - [ ] USB 3.0 Powered Hub - $25
 - [ ] USB-to-Serial CH340 - $8
-- [ ] DC-DC Buck 5V/5A (Pi power) - $10
+- [ ] DC-DC Buck 5V/5A USB-C (Pi power) - $12
 - [ ] DC-DC Buck 5V/3A (servo logic) - $8
 - [ ] INA219 Battery Monitor - $8
 
@@ -251,4 +251,5 @@ Order from: [Misumi HFS3 15x15mm](https://us.misumi-ec.com/vona2/detail/11030046
 ---
 
 *Generated: December 2025*
+*Links verified: December 31, 2025*
 *Source: Sawppy upstream docs*
