@@ -1,0 +1,15 @@
+# Sawppy Control Parameters
+
+ackermann_controller:
+  ros__parameters:
+    max_linear_velocity: 0.5
+    max_angular_velocity: 1.85
+    wheel_radius: 0.06
+    publish_rate: 20.0
+
+odometry_node:
+  ros__parameters:
+    wheel_radius: 0.06
+    publish_rate: 20.0
+    odom_frame: odom
+    base_frame: base_footprint

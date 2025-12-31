@@ -1,0 +1,29 @@
+# Sawppy AI-Link Configuration
+
+ai_link_node:
+  ros__parameters:
+    # Ollama server connection
+    host: "192.168.1.100"  # MacBook Pro IP
+    port: 11434
+
+    # TLS settings
+    use_tls: true
+    verify_ssl: true
+    # ca_cert: "/path/to/ca.crt"
+    # client_cert: "/path/to/client.crt"
+    # client_key: "/path/to/client.key"
+
+    # Model settings
+    model: "qwen2.5:32b-instruct-q4_K_M"
+
+    # Timeout for AI requests (seconds)
+    timeout: 120.0
+
+# Topic mapping:
+#   /sawppy/ai/command   - Send natural language commands
+#   /sawppy/ai/response  - Receive AI responses (JSON)
+#   /sawppy/ai/status    - Connection status updates
+#   /sawppy/ai/analyze_terrain - Request terrain analysis
+
+# Service:
+#   /sawppy/ai/health_check - Check connection to Ollama server

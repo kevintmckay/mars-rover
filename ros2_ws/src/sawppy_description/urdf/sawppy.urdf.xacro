@@ -1,0 +1,303 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="sawppy">
+
+  <!-- ====================== PROPERTIES ====================== -->
+
+  <!-- Chassis dimensions -->
+  <xacro:property name="body_length" value="0.385"/>
+  <xacro:property name="body_width" value="0.245"/>
+  <xacro:property name="body_height" value="0.10"/>
+
+  <!-- Wheel parameters (from wheel_parameter.h) -->
+  <xacro:property name="wheelbase_front" value="0.14"/>
+  <xacro:property name="wheelbase_back" value="0.14"/>
+  <xacro:property name="track_front" value="0.20"/>
+  <xacro:property name="track_mid" value="0.27"/>
+  <xacro:property name="track_back" value="0.20"/>
+
+  <!-- Wheel dimensions -->
+  <xacro:property name="wheel_radius" value="0.060"/>
+  <xacro:property name="wheel_width" value="0.040"/>
+
+  <!-- Ground clearance -->
+  <xacro:property name="ground_clearance" value="0.08"/>
+
+  <!-- Sensor positions -->
+  <xacro:property name="lidar_height" value="0.15"/>
+  <xacro:property name="camera_height" value="0.12"/>
+  <xacro:property name="camera_forward" value="0.18"/>
+
+  <!-- Colors -->
+  <material name="orange">
+    <color rgba="1.0 0.5 0.0 1.0"/>
+  </material>
+  <material name="black">
+    <color rgba="0.1 0.1 0.1 1.0"/>
+  </material>
+  <material name="grey">
+    <color rgba="0.5 0.5 0.5 1.0"/>
+  </material>
+  <material name="silver">
+    <color rgba="0.7 0.7 0.7 1.0"/>
+  </material>
+
+  <!-- ====================== MACROS ====================== -->
+
+  <!-- Wheel macro -->
+  <xacro:macro name="wheel" params="name x y z">
+    <link name="${name}_wheel">
+      <visual>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <material name="black"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+      </collision>
+      <inertial>
+        <mass value="0.2"/>
+        <inertia ixx="0.0002" ixy="0" ixz="0" iyy="0.0004" iyz="0" izz="0.0002"/>
+      </inertial>
+    </link>
+
+    <joint name="${name}_wheel_joint" type="continuous">
+      <parent link="${name}_steer"/>
+      <child link="${name}_wheel"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit effort="5" velocity="10"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Steering knuckle macro (for corner wheels) -->
+  <xacro:macro name="steer_knuckle" params="name x y z">
+    <link name="${name}_steer">
+      <visual>
+        <geometry>
+          <box size="0.03 0.03 0.04"/>
+        </geometry>
+        <material name="silver"/>
+      </visual>
+      <collision>
+        <geometry>
+          <box size="0.03 0.03 0.04"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.05"/>
+        <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+      </inertial>
+    </link>
+
+    <joint name="${name}_steer_joint" type="revolute">
+      <parent link="base_link"/>
+      <child link="${name}_steer"/>
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="${-pi/3}" upper="${pi/3}" effort="5" velocity="2"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- Fixed knuckle macro (for mid wheels) -->
+  <xacro:macro name="fixed_knuckle" params="name x y z">
+    <link name="${name}_steer">
+      <visual>
+        <geometry>
+          <box size="0.03 0.03 0.04"/>
+        </geometry>
+        <material name="silver"/>
+      </visual>
+      <inertial>
+        <mass value="0.05"/>
+        <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+      </inertial>
+    </link>
+
+    <joint name="${name}_steer_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${name}_steer"/>
+      <origin xyz="${x} ${y} ${z}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <!-- ====================== LINKS ====================== -->
+
+  <!-- Base footprint (ground projection) -->
+  <link name="base_footprint"/>
+
+  <!-- Base link (main chassis) -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <box size="${body_length} ${body_width} ${body_height}"/>
+      </geometry>
+      <origin xyz="0 0 0"/>
+      <material name="orange"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="${body_length} ${body_width} ${body_height}"/>
+      </geometry>
+      <origin xyz="0 0 0"/>
+    </collision>
+    <inertial>
+      <mass value="3.0"/>
+      <inertia ixx="0.02" ixy="0" ixz="0" iyy="0.04" iyz="0" izz="0.05"/>
+    </inertial>
+  </link>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${ground_clearance + body_height/2}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ====================== WHEELS ====================== -->
+
+  <!-- Front Left -->
+  <xacro:steer_knuckle name="front_left"
+    x="${wheelbase_front}"
+    y="${track_front/2}"
+    z="${-body_height/2}"/>
+  <xacro:wheel name="front_left"
+    x="${wheelbase_front}"
+    y="${track_front/2}"
+    z="${-body_height/2}"/>
+
+  <!-- Front Right -->
+  <xacro:steer_knuckle name="front_right"
+    x="${wheelbase_front}"
+    y="${-track_front/2}"
+    z="${-body_height/2}"/>
+  <xacro:wheel name="front_right"
+    x="${wheelbase_front}"
+    y="${-track_front/2}"
+    z="${-body_height/2}"/>
+
+  <!-- Mid Left (fixed steering) -->
+  <xacro:fixed_knuckle name="mid_left"
+    x="0"
+    y="${track_mid/2}"
+    z="${-body_height/2}"/>
+  <xacro:wheel name="mid_left"
+    x="0"
+    y="${track_mid/2}"
+    z="${-body_height/2}"/>
+
+  <!-- Mid Right (fixed steering) -->
+  <xacro:fixed_knuckle name="mid_right"
+    x="0"
+    y="${-track_mid/2}"
+    z="${-body_height/2}"/>
+  <xacro:wheel name="mid_right"
+    x="0"
+    y="${-track_mid/2}"
+    z="${-body_height/2}"/>
+
+  <!-- Rear Left -->
+  <xacro:steer_knuckle name="rear_left"
+    x="${-wheelbase_back}"
+    y="${track_back/2}"
+    z="${-body_height/2}"/>
+  <xacro:wheel name="rear_left"
+    x="${-wheelbase_back}"
+    y="${track_back/2}"
+    z="${-body_height/2}"/>
+
+  <!-- Rear Right -->
+  <xacro:steer_knuckle name="rear_right"
+    x="${-wheelbase_back}"
+    y="${-track_back/2}"
+    z="${-body_height/2}"/>
+  <xacro:wheel name="rear_right"
+    x="${-wheelbase_back}"
+    y="${-track_back/2}"
+    z="${-body_height/2}"/>
+
+  <!-- ====================== SENSORS ====================== -->
+
+  <!-- Lidar mount -->
+  <link name="lidar_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.035" length="0.04"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.035" length="0.04"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.2"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <joint name="lidar_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="lidar_link"/>
+    <origin xyz="0 0 ${body_height/2 + lidar_height}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera mount -->
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="0.09 0.025 0.025"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.09 0.025 0.025"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.15"/>
+      <inertia ixx="0.00005" ixy="0" ixz="0" iyy="0.00005" iyz="0" izz="0.00005"/>
+    </inertial>
+  </link>
+
+  <joint name="camera_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="camera_link"/>
+    <origin xyz="${camera_forward} 0 ${body_height/2 + camera_height}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Camera optical frame (Z forward, X right, Y down) -->
+  <link name="camera_optical_frame"/>
+
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical_frame"/>
+    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+  </joint>
+
+  <!-- IMU -->
+  <link name="imu_link">
+    <visual>
+      <geometry>
+        <box size="0.02 0.02 0.005"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="0.000001" ixy="0" ixz="0" iyy="0.000001" iyz="0" izz="0.000001"/>
+    </inertial>
+  </link>
+
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 ${body_height/2}" rpy="0 0 0"/>
+  </joint>
+
+</robot>

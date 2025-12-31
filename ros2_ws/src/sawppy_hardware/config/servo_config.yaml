@@ -1,0 +1,23 @@
+# LX-16A Servo Configuration for Sawppy
+
+servo_bus_node:
+  ros__parameters:
+    port: /dev/ttyUSB0
+    baudrate: 115200
+    publish_rate: 20.0
+    read_positions: true
+
+# Servo ID Mapping
+# Drive Servos (motor mode):
+#   Front Left:  25
+#   Front Right: 27
+#   Mid Left:    21
+#   Mid Right:   22
+#   Rear Left:   20
+#   Rear Right:  28
+#
+# Steering Servos (position mode):
+#   Front Left:  23
+#   Front Right: 29
+#   Rear Left:   24
+#   Rear Right:  26
