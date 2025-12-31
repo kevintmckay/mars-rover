@@ -165,22 +165,27 @@ class AckermannController(Node):
                 hypotenuse = math.sqrt(opposite**2 + adjacent**2)
 
                 # Steering angle (only for corner wheels)
+                # Use atan2 to avoid division by zero and handle all quadrants
                 if abs(opposite) > 0.001:
-                    steer_rad = math.atan(opposite / adjacent)
+                    steer_rad = math.atan2(opposite, adjacent)
                 else:
                     steer_rad = 0.0
 
                 # Wheel speed is proportional to distance from turn center
                 speed = angular * hypotenuse
 
-                # Fix sign when not turning in place
+                # Determine speed sign based on which side of turn center the wheel is
+                # Wheels on the inside of the turn move slower/opposite to outside wheels
                 if abs(turn_center) > 0.001:
-                    speed = math.copysign(speed, linear)
+                    # Check if wheel is on the opposite side of turn center from robot center
+                    wheel_side = 1 if wp.y > 0 else -1
+                    turn_side = 1 if turn_center > 0 else -1
 
-                # If turn center is between robot center and wheel, reverse direction
-                if (turn_center > 0 and wp.y > 0 and wp.y > turn_center) or \
-                   (turn_center < 0 and wp.y < 0 and wp.y < turn_center):
-                    speed *= -1
+                    if wheel_side == turn_side and abs(wp.y) > abs(turn_center):
+                        # Wheel is beyond the turn center - reverse direction
+                        speed = -abs(speed) * (1 if linear >= 0 else -1)
+                    else:
+                        speed = abs(speed) * (1 if linear >= 0 else -1)
 
                 speeds[i] = speed
 

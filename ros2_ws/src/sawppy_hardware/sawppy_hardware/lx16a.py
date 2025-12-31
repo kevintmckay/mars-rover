@@ -261,7 +261,7 @@ class LX16ADriver:
         speed = int(velocity * 10)
 
         # Mode 1 = motor mode, speed as signed 16-bit
-        data = struct.pack('<BbH', 1, 0, speed & 0xFFFF)
+        data = struct.pack('<Bbh', 1, 0, speed)
         return self._send_command(servo_id, CMD_MODE_WRITE, data)
 
     def stop(self, servo_id: int) -> bool:

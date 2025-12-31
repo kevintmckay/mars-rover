@@ -5,6 +5,8 @@ Provides interface between ROS2 and the LX-16A serial bus servos.
 Publishes joint states and subscribes to joint commands.
 """
 
+import math
+
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
@@ -139,8 +141,6 @@ class ServoBusNode(Node):
                     self.steer_angles[i] = (pos - 500) * (120.0 / 500.0)
 
         # Convert to radians for joint state
-        import math
-
         # Drive joints - report velocity (rad/s estimated from command)
         # For continuous joints, position wraps but we report velocity
         drive_positions = [0.0] * 6  # Position tracking not implemented
