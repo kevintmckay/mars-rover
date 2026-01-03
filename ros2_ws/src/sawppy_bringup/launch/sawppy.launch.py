@@ -113,6 +113,19 @@ def generate_launch_description():
             }]
         ),
 
+        # Thermal monitor (Pi 5 CPU temp and throttling)
+        Node(
+            package='sawppy_sensors',
+            executable='thermal_monitor',
+            name='thermal_monitor',
+            output='screen',
+            parameters=[{
+                'publish_rate': 1.0,
+                'warn_temp': 70.0,
+                'critical_temp': 80.0,
+            }]
+        ),
+
         # AI-Link (conditional)
         Node(
             package='sawppy_ai',
