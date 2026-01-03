@@ -15,7 +15,12 @@ setup(
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
         (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
     ],
-    install_requires=['setuptools'],
+    install_requires=[
+        'setuptools',
+        'adafruit-blinka',
+        'adafruit-circuitpython-bno055',
+        'vl53l0x',
+    ],
     zip_safe=True,
     maintainer='Kevin',
     maintainer_email='kevin@localhost',
