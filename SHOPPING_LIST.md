@@ -5,7 +5,7 @@
 | Category | Est. Cost |
 |----------|-----------|
 | Servos & Control | $160 |
-| **Autonomy Sensors** | **$459** |
+| **Autonomy Sensors** | **$317** |
 | **Autonomy Electronics** | **$20** |
 | **Wiring & Cables** | **$39** |
 | Electronics (misc) | $8 |
@@ -15,7 +15,7 @@
 | Hardware (inserts, brass screws, sleeve) | $30 |
 | 3D Printing Filament | $100 |
 | **BASE TOTAL** | **$383-413** |
-| **AUTONOMY TOTAL** | **$901-931** |
+| **AUTONOMY TOTAL** | **$759-789** |
 
 *Note: Excludes items already owned (Pi, LiPo, microSD, JST, Deans, M3 hardware)*
 
@@ -33,18 +33,29 @@
 
 ---
 
-## 2. Autonomy Sensors (Amazon/Slamtec/Intel)
+## 2. Autonomy Sensors (Luxonis/Amazon)
 
 | Qty | Item | Unit Price | Total | Link |
 |-----|------|------------|-------|------|
 | 1 | RPLidar A1 (12m 2D Lidar) | $99 | $99 | [Amazon](https://www.amazon.com/Stemedu-Distance-Developed-Omnidirectional-Scanning/dp/B07L89TT6F) |
-| 1 | Intel RealSense D435i (Depth Camera + IMU) | $300 | $300 | [Amazon](https://www.amazon.com/Intel-RealSense-Depth-Camera-D435i/dp/B07MWR2YJB) |
+| 1 | OAK-D Lite (Stereo Depth + AI) | $150 | $150 | [Luxonis](https://shop.luxonis.com/products/oak-d-lite-1) |
 | 1 | BNO055 IMU (9-axis) | $35 | $35 | [Adafruit](https://www.adafruit.com/product/2472) |
+| 1 | VL53L0X ToF Sensor (front bumper) | $8 | $8 | [Amazon](https://www.amazon.com/HiLetgo-VL53L0X-Distance-Ranging-Sensor/dp/B071DW8M8V) |
 | 1 | USB 3.0 Powered Hub (4-port) | $25 | $25 | [Amazon](https://www.amazon.com/atolla-Charging-Splitter-Individual-Switches/dp/B083XTKV8V) |
 
-**Subtotal: ~$459**
+**Subtotal: ~$317**
 
-*Note: D435i includes built-in IMU, but external BNO055 provides better accuracy for EKF fusion*
+### Why OAK-D Lite over RealSense D435i?
+
+| Factor | OAK-D Lite | D435i |
+|--------|------------|-------|
+| Price | $150 | $315 |
+| CPU load | Low (on-device compute) | Medium |
+| Visual Odometry | Built-in `/oak/odom` | Needs rtabmap |
+| Outdoor performance | Better (passive stereo) | Struggles in sunlight |
+| On-device AI | Yes (Myriad X) | No |
+
+*Trade-off: OAK-D Lite needs textured surfaces (no blank white walls). Fine for outdoor rover.*
 
 ---
 
@@ -56,8 +67,6 @@
 | 1 | INA219 Battery Monitor (optional) | $8 | $8 | [Amazon](https://www.amazon.com/HiLetgo-INA219-Bi-directional-Current-Breakout/dp/B01ICN5OAM) |
 
 **Subtotal: ~$20**
-
-*Note: Removed USB-to-Serial CH340 (RPLidar A1 has built-in USB) and 5V/3A buck (servos run on battery voltage, not 5V)*
 
 ---
 
@@ -83,7 +92,7 @@
     │
     └─[XT30]─[5A Fuse]──→ 5V/5A Buck ──USB-C──→ Pi 5 Power
                                │
-                               └──→ USB Hub ──→ RealSense D435i
+                               └──→ USB Hub ──→ OAK-D Lite
                                           └──→ RPLidar A1
 ```
 
@@ -211,6 +220,7 @@ Order from: [Misumi HFS3 15x15mm](https://us.misumi-ec.com/vona2/detail/11030046
 | Arduino Nano (backup control) | $12 | [Amazon](https://amzn.to/3bvAFXy) |
 | Joystick module | $6 | For wired backup |
 | USB WiFi adapter (5GHz) | $15 | Better range for AI offload |
+| NEO-6M GPS module | $12 | Outdoor waypoint navigation |
 
 ---
 
@@ -235,10 +245,13 @@ Order from: [Misumi HFS3 15x15mm](https://us.misumi-ec.com/vona2/detail/11030046
 - [ ] Cable sleeve - $10
 - [ ] 4kg PLA/PETG filament - $100 *(or local)*
 
-### Amazon - Autonomy Sensors (~$459)
+### Luxonis - Depth Camera (~$150)
+- [ ] OAK-D Lite - $150
+
+### Amazon - Autonomy Sensors (~$167)
 - [ ] RPLidar A1 (12m 2D Lidar) - $99
-- [ ] Intel RealSense D435i (Depth + IMU) - $300
 - [ ] BNO055 IMU (or Adafruit) - $35
+- [ ] VL53L0X ToF (front bumper) - $8
 - [ ] USB 3.0 Powered Hub - $25
 
 ### Amazon - Autonomy Electronics & Wiring (~$59)
@@ -295,8 +308,9 @@ Order from: [Misumi HFS3 15x15mm](https://us.misumi-ec.com/vona2/detail/11030046
 |-----|------|-------|
 | 1 | Lidar Tower | 150mm height, mounts to chassis top |
 | 1 | Lidar Base Plate | Fits RPLidar A1 mounting holes |
-| 1 | Camera Bracket | 180mm forward, 120mm above chassis |
+| 1 | Camera Bracket | OAK-D Lite mount, 180mm forward |
 | 1 | IMU Enclosure | Mounts to chassis top center |
+| 1 | ToF Bumper Mount | Front-facing VL53L0X holder |
 | 1 | Pi 5 Mounting Tray | With ventilation slots |
 | 1 | USB Hub Mount | |
 | 10 | Cable Clips | For wire management |
@@ -307,11 +321,33 @@ Order from: [Misumi HFS3 15x15mm](https://us.misumi-ec.com/vona2/detail/11030046
 
 | Port | Device | Notes |
 |------|--------|-------|
-| USB 3.0 #1 | Intel RealSense D435i | Requires USB 3.0 bandwidth |
+| USB 3.0 #1 | OAK-D Lite | Requires USB 3.0 bandwidth |
 | USB 3.0 #2 | USB Hub (powered) | Expansion |
 | USB 2.0 #1 | BusLinker (servos) | Serial @ 115200 baud |
 | USB 2.0 #2 | RPLidar A1 | Built-in USB interface |
-| I2C (GPIO) | BNO055 IMU | Via logic level shifter |
+| I2C (GPIO) | BNO055 IMU + VL53L0X | Shared I2C bus via level shifter |
+
+---
+
+## Sensor Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      LOCALIZATION                           │
+├─────────────────────────────────────────────────────────────┤
+│  RPLidar A1 ──→ SLAM Toolbox ──→ map→odom correction       │
+│  OAK-D Lite ──→ Visual Odometry ──→ /oak/odom              │
+│  BNO055 IMU ──→ EKF fusion ──→ /odom                       │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    OBSTACLE DETECTION                       │
+├─────────────────────────────────────────────────────────────┤
+│  RPLidar A1 ──→ 2D obstacle layer                          │
+│  OAK-D Lite ──→ 3D voxel obstacle layer                    │
+│  VL53L0X ToF ──→ Close-range bumper stop (0-1.2m)          │
+└─────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -321,7 +357,8 @@ Order from: [Misumi HFS3 15x15mm](https://us.misumi-ec.com/vona2/detail/11030046
 |------|--------|
 | Dec 2025 | Initial shopping list |
 | Dec 2025 | Verified Amazon links, updated to D435i |
-| Jan 2026 | Added wiring section, removed unnecessary items (CH340, 5V/3A buck), increased filament to 4kg, added sensor mount prints, added USB port allocation |
+| Jan 2026 | Added wiring section, removed unnecessary items, increased filament to 4kg |
+| Jan 2026 | Replaced D435i with OAK-D Lite (saves $150, better outdoor, built-in VO), added VL53L0X ToF bumper |
 
 ---
 
