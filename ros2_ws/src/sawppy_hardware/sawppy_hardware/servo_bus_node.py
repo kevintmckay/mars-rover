@@ -13,9 +13,14 @@ from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, String
 
 from .lx16a import LX16ADriver, SawppyServos
+
+# Recovery parameters
+RECOVERY_INITIAL_DELAY_SEC = 1.0
+RECOVERY_MAX_DELAY_SEC = 30.0
+RECOVERY_BACKOFF_MULTIPLIER = 2.0
 
 # Watchdog timeout - stop motors if no command received within this time
 WATCHDOG_TIMEOUT_SEC = 0.5  # 500ms
@@ -69,6 +74,11 @@ class ServoBusNode(Node):
             'joint_states',
             10
         )
+        self.status_pub = self.create_publisher(
+            String,
+            'servo_bus/status',
+            10
+        )
 
         # Subscribers
         qos = QoSProfile(
@@ -111,12 +121,29 @@ class ServoBusNode(Node):
         self.consecutive_errors = 0
         self.max_consecutive_errors = 5
 
+        # Recovery state
+        self.in_recovery = False
+        self.recovery_delay = RECOVERY_INITIAL_DELAY_SEC
+        self.last_recovery_attempt = 0.0
+        self.recovery_attempts = 0
+
+        # Publish initial status
+        self._publish_status('ok')
+
         self.get_logger().info('Servo bus node initialized')
 
     def drive_cmd_callback(self, msg: Float64MultiArray):
         """Handle drive velocity commands."""
         if len(msg.data) < 6:
             self.get_logger().warning('Drive command needs 6 values')
+            return
+
+        # Reject commands during recovery
+        if self.in_recovery:
+            self.get_logger().warning(
+                'Drive command rejected - in recovery mode',
+                throttle_duration_sec=2.0
+            )
             return
 
         self.drive_velocities = list(msg.data[:6])
@@ -146,6 +173,14 @@ class ServoBusNode(Node):
             self.get_logger().warning('Steer command needs 4 values')
             return
 
+        # Reject commands during recovery
+        if self.in_recovery:
+            self.get_logger().warning(
+                'Steer command rejected - in recovery mode',
+                throttle_duration_sec=2.0
+            )
+            return
+
         self.steer_angles = list(msg.data[:4])
         self.last_steer_cmd_time = time.monotonic()
 
@@ -163,19 +198,119 @@ class ServoBusNode(Node):
         self._update_error_count(errors)
 
     def _update_error_count(self, errors: int):
-        """Track consecutive errors and warn if threshold exceeded."""
+        """Track consecutive errors and trigger recovery if threshold exceeded."""
         if errors > 0:
             self.consecutive_errors += errors
-            if self.consecutive_errors >= self.max_consecutive_errors:
+            if self.consecutive_errors >= self.max_consecutive_errors and not self.in_recovery:
                 self.get_logger().error(
-                    f'High error rate: {self.consecutive_errors} consecutive servo errors',
-                    throttle_duration_sec=5.0
+                    f'High error rate: {self.consecutive_errors} consecutive servo errors - entering recovery'
                 )
+                self._enter_recovery()
         else:
+            # Successful communication - reset error state
+            if self.consecutive_errors > 0:
+                self.get_logger().info('Servo communication restored')
             self.consecutive_errors = 0
+            # Reset recovery backoff on success
+            if self.recovery_attempts > 0:
+                self.recovery_delay = RECOVERY_INITIAL_DELAY_SEC
+                self.recovery_attempts = 0
+                self._publish_status('ok')
+
+    def _publish_status(self, status: str):
+        """Publish servo bus status for monitoring."""
+        msg = String()
+        msg.data = status
+        self.status_pub.publish(msg)
+
+    def _enter_recovery(self):
+        """Enter recovery mode - stop motors and attempt to recover."""
+        self.in_recovery = True
+        self._publish_status('recovery')
+        self._emergency_stop()
+
+        # Schedule recovery attempt
+        self.last_recovery_attempt = time.monotonic()
+        self.get_logger().warning(
+            f'Recovery scheduled in {self.recovery_delay:.1f}s (attempt {self.recovery_attempts + 1})'
+        )
+
+    def _attempt_recovery(self) -> bool:
+        """
+        Attempt to recover serial communication.
+
+        Returns:
+            True if recovery successful
+        """
+        self.recovery_attempts += 1
+        self.get_logger().info(f'Attempting serial recovery (attempt {self.recovery_attempts})')
+
+        # Close existing connection
+        try:
+            self.driver.close()
+        except Exception as e:
+            self.get_logger().warning(f'Error closing serial port: {e}')
+
+        # Brief pause to allow hardware to reset
+        time.sleep(0.1)
+
+        # Attempt to reopen
+        port = self.get_parameter('port').value
+        if not self.driver.open():
+            self.get_logger().error(f'Recovery failed - could not reopen {port}')
+            return False
+
+        self.get_logger().info(f'Serial port {port} reopened successfully')
+
+        # Verify communication by reading from a known servo
+        test_servo = SawppyServos.ALL_STEER[0]
+        pos = self.driver.read_position(test_servo)
+        if pos is None:
+            self.get_logger().error(f'Recovery failed - no response from servo {test_servo}')
+            return False
+
+        self.get_logger().info(f'Recovery successful - servo {test_servo} responded (pos={pos})')
+
+        # Reset error state
+        self.consecutive_errors = 0
+        self.in_recovery = False
+        self.recovery_delay = RECOVERY_INITIAL_DELAY_SEC
+        self._publish_status('ok')
+
+        return True
+
+    def _check_recovery(self):
+        """Check if it's time to attempt recovery (called from watchdog)."""
+        if not self.in_recovery:
+            return
+
+        now = time.monotonic()
+        elapsed = now - self.last_recovery_attempt
+
+        if elapsed >= self.recovery_delay:
+            if self._attempt_recovery():
+                self.get_logger().info('Recovery complete - resuming normal operation')
+            else:
+                # Exponential backoff for next attempt
+                self.recovery_delay = min(
+                    self.recovery_delay * RECOVERY_BACKOFF_MULTIPLIER,
+                    RECOVERY_MAX_DELAY_SEC
+                )
+                self.last_recovery_attempt = now
+                self._publish_status('recovery_failed')
+                self.get_logger().warning(
+                    f'Recovery failed - next attempt in {self.recovery_delay:.1f}s'
+                )
 
     def watchdog_callback(self):
-        """Check for command timeout and stop motors if no recent commands."""
+        """Check for command timeout, stop motors, and manage recovery."""
+        # Check if recovery attempt is due
+        self._check_recovery()
+
+        # Skip watchdog during recovery (motors already stopped)
+        if self.in_recovery:
+            return
+
         now = time.monotonic()
         drive_timeout = (now - self.last_drive_cmd_time) > WATCHDOG_TIMEOUT_SEC
 
@@ -231,6 +366,7 @@ class ServoBusNode(Node):
     def shutdown(self):
         """Shutdown node and stop all servos."""
         self.get_logger().info('Shutting down, stopping all servos...')
+        self._publish_status('shutdown')
 
         # Cancel timers
         self.watchdog_timer.cancel()
