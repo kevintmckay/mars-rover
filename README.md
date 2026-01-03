@@ -117,15 +117,27 @@ ollama pull qwen2.5:14b-instruct          # Fast responses
 - Path planning assistance
 - Decision making
 
+## 3D Printed Parts
+
+STL files are available in [`stl/`](stl/) (symlinked from upstream). See [SHOPPING_LIST.md](SHOPPING_LIST.md#printed-parts-checklist) for quantities.
+
+Key parts: Wheels, Steering Knuckles, Rocker, Bogie, Differential, Body Corners, LX-16A Brackets/Couplers.
+
+## Wiring
+
+![Wiring Overview](docs/wiring_overview.png)
+
+See [`upstream/docs/wiring/`](upstream/docs/wiring/) for detailed harness diagrams.
+
 ## Shopping List
 
 See [SHOPPING_LIST.md](SHOPPING_LIST.md) for complete parts list.
 
 | Category | Cost |
 |----------|------|
-| Base Sawppy Build | ~$358-388 |
-| Autonomy Sensors | ~$493 |
-| **Total** | **~$851-881** |
+| Base Sawppy Build | ~$383-413 |
+| Autonomy Sensors & Electronics | ~$516 |
+| **Total** | **~$899-929** |
 
 ## Project Structure
 
@@ -134,13 +146,17 @@ See [SHOPPING_LIST.md](SHOPPING_LIST.md) for complete parts list.
 ├── README.md
 ├── SHOPPING_LIST.md
 ├── ros2_ws/              # ROS2 workspace
-│   └── src/              # Source packages
-└── upstream/             # Original Sawppy repo (reference)
+│   └── src/              # Source packages (8 packages)
+├── stl/                  # 3D printable parts (symlink → upstream/STL)
+├── docs/                 # Wiring diagrams, documentation
+├── upstream/             # Sawppy_Rover by Roger Cheng (submodule)
+└── jpl/                  # NASA JPL Open Source Rover (submodule)
 ```
 
 ## References
 
-- [Sawppy Rover](https://github.com/Roger-random/Sawppy_Rover) - Original design by Roger Cheng
+- [Sawppy Rover](https://github.com/Roger-random/Sawppy_Rover) - Original design by Roger Cheng ($500 build)
+- [JPL Open Source Rover](https://github.com/nasa-jpl/open-source-rover) - NASA's educational rover ($1,600 build)
 - [ROS2 Jazzy](https://docs.ros.org/en/jazzy/) - Robot Operating System
 - [Nav2](https://docs.nav2.org/) - Navigation stack
 - [Ollama](https://ollama.ai/) - Local LLM inference
