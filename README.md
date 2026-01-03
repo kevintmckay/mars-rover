@@ -149,14 +149,12 @@ See [SHOPPING_LIST.md](SHOPPING_LIST.md) for complete parts list.
 │   └── src/              # Source packages (8 packages)
 ├── stl/                  # 3D printable parts (symlink → upstream/STL)
 ├── docs/                 # Wiring diagrams, documentation
-├── upstream/             # Sawppy_Rover by Roger Cheng (submodule)
-└── jpl/                  # NASA JPL Open Source Rover (submodule)
+└── upstream/             # Sawppy_Rover by Roger Cheng (submodule)
 ```
 
 ## References
 
-- [Sawppy Rover](https://github.com/Roger-random/Sawppy_Rover) - Original design by Roger Cheng ($500 build)
-- [JPL Open Source Rover](https://github.com/nasa-jpl/open-source-rover) - NASA's educational rover ($1,600 build)
+- [Sawppy Rover](https://github.com/Roger-random/Sawppy_Rover) - Original design by Roger Cheng
 - [ROS2 Jazzy](https://docs.ros.org/en/jazzy/) - Robot Operating System
 - [Nav2](https://docs.nav2.org/) - Navigation stack
 - [Ollama](https://ollama.ai/) - Local LLM inference

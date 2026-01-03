@@ -1,6 +1,3 @@
 [submodule "upstream"]
 	path = upstream
 	url = https://github.com/Roger-random/Sawppy_Rover
-[submodule "jpl"]
-	path = jpl
-	url = https://github.com/nasa-jpl/open-source-rover
