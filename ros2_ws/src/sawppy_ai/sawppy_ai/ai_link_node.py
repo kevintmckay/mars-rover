@@ -8,6 +8,8 @@ remote GPU server running Ollama.
 
 import asyncio
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import rclpy
@@ -20,6 +22,11 @@ from sensor_msgs.msg import Image
 
 from .client import AILinkClient, TaskType, AIResponse
 from .config import AILinkConfig
+
+# Reconnection settings
+RECONNECT_INITIAL_DELAY = 1.0  # seconds
+RECONNECT_MAX_DELAY = 60.0  # seconds
+RECONNECT_MULTIPLIER = 2.0
 
 
 class AILinkNode(Node):
@@ -71,8 +78,15 @@ class AILinkNode(Node):
 
         # Initialize client
         self.client = AILinkClient(self.config)
-        self._loop = asyncio.new_event_loop()
         self._connected = False
+        self._reconnect_delay = RECONNECT_INITIAL_DELAY
+        self._reconnecting = False
+
+        # Thread pool for async AI operations (avoids blocking ROS executor)
+        self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ai_link")
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop_thread: Optional[threading.Thread] = None
+        self._start_async_loop()
 
         # Callback group for async operations
         self.callback_group = ReentrantCallbackGroup()
@@ -133,30 +147,93 @@ class AILinkNode(Node):
 
         self.get_logger().info("Sawppy AI-Link node initialized")
 
-    def _run_async(self, coro):
-        """Run async coroutine in the event loop."""
-        return self._loop.run_until_complete(coro)
+    def _start_async_loop(self):
+        """Start dedicated event loop in background thread."""
+        def run_loop():
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            self._loop.run_forever()
 
-    async def _startup_connect_async(self):
-        """Async startup connection."""
+        self._loop_thread = threading.Thread(target=run_loop, daemon=True)
+        self._loop_thread.start()
+        # Wait for loop to start
+        while self._loop is None:
+            threading.Event().wait(0.01)
+
+    def _run_async(self, coro):
+        """Run async coroutine in the dedicated event loop (non-blocking to ROS)."""
+        if self._loop is None or not self._loop.is_running():
+            raise RuntimeError("Async event loop not running")
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return future.result(timeout=self.config.timeout + 5.0)
+
+    async def _connect_async(self):
+        """Async connection with retry logic."""
         try:
             success = await self.client.connect()
             if success:
                 self._connected = True
+                self._reconnect_delay = RECONNECT_INITIAL_DELAY  # Reset backoff
                 self.get_logger().info(
                     f"Connected to Ollama at {self.config.base_url}"
                 )
                 models = await self.client.list_models()
                 self.get_logger().info(f"Available models: {models}")
+                return True
             else:
-                self.get_logger().warn("Failed to connect to Ollama server")
+                self.get_logger().warning("Failed to connect to Ollama server")
+                return False
         except Exception as e:
             self.get_logger().error(f"Connection error: {e}")
+            return False
 
     def _startup_connect(self):
         """Initial connection attempt."""
-        self._run_async(self._startup_connect_async())
         self.startup_timer.cancel()
+        self._attempt_connection()
+
+    def _attempt_connection(self):
+        """Attempt connection, schedule retry on failure."""
+        if self._reconnecting:
+            return
+        self._reconnecting = True
+
+        def connect_task():
+            try:
+                success = self._run_async(self._connect_async())
+                if not success:
+                    self._schedule_reconnect()
+            except Exception as e:
+                self.get_logger().error(f"Connection attempt failed: {e}")
+                self._schedule_reconnect()
+            finally:
+                self._reconnecting = False
+
+        self._executor.submit(connect_task)
+
+    def _schedule_reconnect(self):
+        """Schedule reconnection with exponential backoff."""
+        if self._connected:
+            return
+
+        self.get_logger().info(
+            f"Scheduling reconnection in {self._reconnect_delay:.1f}s"
+        )
+        self.create_timer(
+            self._reconnect_delay,
+            self._reconnect_callback,
+            callback_group=self.callback_group,
+        )
+        # Increase delay for next attempt (exponential backoff)
+        self._reconnect_delay = min(
+            self._reconnect_delay * RECONNECT_MULTIPLIER,
+            RECONNECT_MAX_DELAY
+        )
+
+    def _reconnect_callback(self):
+        """Timer callback for reconnection."""
+        if not self._connected:
+            self._attempt_connection()
 
     def _publish_status(self):
         """Publish connection status."""
@@ -191,20 +268,25 @@ class AILinkNode(Node):
         self.get_logger().info(f"Received command: {command}")
 
         if not self._connected:
-            self.get_logger().warn("Not connected to AI server")
+            self.get_logger().warning("Not connected to AI server")
+            self._attempt_connection()
             return
 
-        try:
-            response = self._run_async(self._process_command_async(command))
+        def process_task():
+            try:
+                response = self._run_async(self._process_command_async(command))
 
-            resp_msg = String()
-            resp_msg.data = json.dumps(response.to_dict())
-            self.response_pub.publish(resp_msg)
+                resp_msg = String()
+                resp_msg.data = json.dumps(response.to_dict())
+                self.response_pub.publish(resp_msg)
 
-            self.get_logger().info(f"AI response: {response.text[:100]}...")
+                self.get_logger().info(f"AI response: {response.text[:100]}...")
 
-        except Exception as e:
-            self.get_logger().error(f"Command processing error: {e}")
+            except Exception as e:
+                self.get_logger().error(f"Command processing error: {e}")
+                self._handle_connection_error()
+
+        self._executor.submit(process_task)
 
     def _terrain_callback(self, msg: String):
         """Handle terrain analysis requests."""
@@ -212,20 +294,32 @@ class AILinkNode(Node):
         self.get_logger().info("Analyzing terrain...")
 
         if not self._connected:
-            self.get_logger().warn("Not connected to AI server")
+            self.get_logger().warning("Not connected to AI server")
+            self._attempt_connection()
             return
 
-        try:
-            response = self._run_async(self._analyze_terrain_async(sensor_data))
+        def terrain_task():
+            try:
+                response = self._run_async(self._analyze_terrain_async(sensor_data))
 
-            resp_msg = String()
-            resp_msg.data = json.dumps(response.to_dict())
-            self.response_pub.publish(resp_msg)
+                resp_msg = String()
+                resp_msg.data = json.dumps(response.to_dict())
+                self.response_pub.publish(resp_msg)
 
-            self.get_logger().info(f"Terrain analysis: {response.text[:100]}...")
+                self.get_logger().info(f"Terrain analysis: {response.text[:100]}...")
 
-        except Exception as e:
-            self.get_logger().error(f"Terrain analysis error: {e}")
+            except Exception as e:
+                self.get_logger().error(f"Terrain analysis error: {e}")
+                self._handle_connection_error()
+
+        self._executor.submit(terrain_task)
+
+    def _handle_connection_error(self):
+        """Handle connection errors by marking disconnected and scheduling reconnect."""
+        if self._connected:
+            self._connected = False
+            self.get_logger().warning("Lost connection to AI server")
+            self._schedule_reconnect()
 
     def _health_check_callback(self, request, response):
         """Health check service callback."""
@@ -239,8 +333,26 @@ class AILinkNode(Node):
 
     def destroy_node(self):
         """Cleanup on shutdown."""
-        self._run_async(self.client.disconnect())
-        self._loop.close()
+        self.get_logger().info("Shutting down AI-Link node...")
+
+        # Disconnect client
+        try:
+            if self._connected:
+                self._run_async(self.client.disconnect())
+        except Exception as e:
+            self.get_logger().warning(f"Error disconnecting: {e}")
+
+        # Stop event loop
+        if self._loop is not None and self._loop.is_running():
+            self._loop.call_soon_threadsafe(self._loop.stop)
+
+        # Wait for loop thread to finish
+        if self._loop_thread is not None:
+            self._loop_thread.join(timeout=2.0)
+
+        # Shutdown executor
+        self._executor.shutdown(wait=False)
+
         super().destroy_node()
 
 

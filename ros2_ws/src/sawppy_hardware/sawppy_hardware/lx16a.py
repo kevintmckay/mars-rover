@@ -12,6 +12,7 @@ Protocol:
 
 import serial
 import struct
+import threading
 import time
 from typing import Optional
 from dataclasses import dataclass
@@ -97,6 +98,7 @@ class LX16ADriver:
         self.baudrate = baudrate
         self.timeout = timeout
         self._serial: Optional[serial.Serial] = None
+        self._lock = threading.Lock()  # Mutex for thread-safe serial access
 
     def open(self) -> bool:
         """Open serial connection."""
@@ -133,7 +135,7 @@ class LX16ADriver:
 
     def _send_command(self, servo_id: int, cmd: int, data: bytes = b'') -> bool:
         """
-        Send a command to a servo.
+        Send a command to a servo (must be called with lock held).
 
         Args:
             servo_id: Servo ID (1-253, 254=broadcast)
@@ -155,6 +157,11 @@ class LX16ADriver:
             return True
         except serial.SerialException:
             return False
+
+    def _send_command_locked(self, servo_id: int, cmd: int, data: bytes = b'') -> bool:
+        """Send a command to a servo with thread safety."""
+        with self._lock:
+            return self._send_command(servo_id, cmd, data)
 
     def _read_response(self, expected_cmd: int) -> Optional[bytes]:
         """
@@ -227,7 +234,7 @@ class LX16ADriver:
 
         # Pack position and time as little-endian uint16
         data = struct.pack('<HH', position, time_ms)
-        return self._send_command(servo_id, CMD_MOVE_TIME_WRITE, data)
+        return self._send_command_locked(servo_id, CMD_MOVE_TIME_WRITE, data)
 
     def move_to_position(self, servo_id: int, position: int, time_ms: int = 200) -> bool:
         """
@@ -243,7 +250,7 @@ class LX16ADriver:
         """
         position = max(POS_MIN, min(POS_MAX, position))
         data = struct.pack('<HH', position, time_ms)
-        return self._send_command(servo_id, CMD_MOVE_TIME_WRITE, data)
+        return self._send_command_locked(servo_id, CMD_MOVE_TIME_WRITE, data)
 
     def spin(self, servo_id: int, velocity: float) -> bool:
         """
@@ -262,24 +269,24 @@ class LX16ADriver:
 
         # Mode 1 = motor mode, speed as signed 16-bit
         data = struct.pack('<Bbh', 1, 0, speed)
-        return self._send_command(servo_id, CMD_MODE_WRITE, data)
+        return self._send_command_locked(servo_id, CMD_MODE_WRITE, data)
 
     def stop(self, servo_id: int) -> bool:
         """Stop servo movement."""
-        return self._send_command(servo_id, CMD_MOVE_STOP)
+        return self._send_command_locked(servo_id, CMD_MOVE_STOP)
 
     def set_servo_mode(self, servo_id: int) -> bool:
         """Set servo to position control mode."""
         data = struct.pack('<BBH', 0, 0, 0)
-        return self._send_command(servo_id, CMD_MODE_WRITE, data)
+        return self._send_command_locked(servo_id, CMD_MODE_WRITE, data)
 
     def enable_torque(self, servo_id: int) -> bool:
         """Enable servo torque (load)."""
-        return self._send_command(servo_id, CMD_LOAD_WRITE, bytes([1]))
+        return self._send_command_locked(servo_id, CMD_LOAD_WRITE, bytes([1]))
 
     def disable_torque(self, servo_id: int) -> bool:
         """Disable servo torque (unload)."""
-        return self._send_command(servo_id, CMD_LOAD_WRITE, bytes([0]))
+        return self._send_command_locked(servo_id, CMD_LOAD_WRITE, bytes([0]))
 
     def read_position(self, servo_id: int) -> Optional[int]:
         """
@@ -294,16 +301,17 @@ class LX16ADriver:
         if not self._serial:
             return None
 
-        # Flush input buffer
-        self._serial.reset_input_buffer()
+        with self._lock:
+            # Flush input buffer
+            self._serial.reset_input_buffer()
 
-        if not self._send_command(servo_id, CMD_POS_READ):
+            if not self._send_command(servo_id, CMD_POS_READ):
+                return None
+
+            data = self._read_response(CMD_POS_READ)
+            if data and len(data) >= 2:
+                return struct.unpack('<h', data[:2])[0]
             return None
-
-        data = self._read_response(CMD_POS_READ)
-        if data and len(data) >= 2:
-            return struct.unpack('<h', data[:2])[0]
-        return None
 
     def read_angle(self, servo_id: int) -> Optional[float]:
         """
@@ -333,16 +341,17 @@ class LX16ADriver:
         if not self._serial:
             return None
 
-        self._serial.reset_input_buffer()
+        with self._lock:
+            self._serial.reset_input_buffer()
 
-        if not self._send_command(servo_id, CMD_VIN_READ):
+            if not self._send_command(servo_id, CMD_VIN_READ):
+                return None
+
+            data = self._read_response(CMD_VIN_READ)
+            if data and len(data) >= 2:
+                mv = struct.unpack('<H', data[:2])[0]
+                return mv / 1000.0
             return None
-
-        data = self._read_response(CMD_VIN_READ)
-        if data and len(data) >= 2:
-            mv = struct.unpack('<H', data[:2])[0]
-            return mv / 1000.0
-        return None
 
     def read_temperature(self, servo_id: int) -> Optional[int]:
         """
@@ -357,15 +366,16 @@ class LX16ADriver:
         if not self._serial:
             return None
 
-        self._serial.reset_input_buffer()
+        with self._lock:
+            self._serial.reset_input_buffer()
 
-        if not self._send_command(servo_id, CMD_TEMP_READ):
+            if not self._send_command(servo_id, CMD_TEMP_READ):
+                return None
+
+            data = self._read_response(CMD_TEMP_READ)
+            if data and len(data) >= 1:
+                return data[0]
             return None
-
-        data = self._read_response(CMD_TEMP_READ)
-        if data and len(data) >= 1:
-            return data[0]
-        return None
 
     def set_id(self, old_id: int, new_id: int) -> bool:
         """
@@ -380,7 +390,7 @@ class LX16ADriver:
         """
         if not (1 <= new_id <= 253):
             return False
-        return self._send_command(old_id, CMD_ID_WRITE, bytes([new_id]))
+        return self._send_command_locked(old_id, CMD_ID_WRITE, bytes([new_id]))
 
     def set_led(self, servo_id: int, on: bool) -> bool:
         """
@@ -393,7 +403,7 @@ class LX16ADriver:
         Returns:
             True if command sent successfully
         """
-        return self._send_command(servo_id, CMD_LED_CTRL_WRITE, bytes([0 if on else 1]))
+        return self._send_command_locked(servo_id, CMD_LED_CTRL_WRITE, bytes([0 if on else 1]))
 
 
 # Sawppy-specific servo mapping

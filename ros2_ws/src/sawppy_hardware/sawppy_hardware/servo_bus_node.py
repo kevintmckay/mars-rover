@@ -6,6 +6,7 @@ Publishes joint states and subscribes to joint commands.
 """
 
 import math
+import time
 
 import rclpy
 from rclpy.node import Node
@@ -15,6 +16,9 @@ from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
 
 from .lx16a import LX16ADriver, SawppyServos
+
+# Watchdog timeout - stop motors if no command received within this time
+WATCHDOG_TIMEOUT_SEC = 0.5  # 500ms
 
 
 class ServoBusNode(Node):
@@ -95,6 +99,18 @@ class ServoBusNode(Node):
         self.steer_angles = [0.0] * 4
         self.steer_positions = [500] * 4  # Raw positions
 
+        # Watchdog state
+        self.last_drive_cmd_time = time.monotonic()
+        self.last_steer_cmd_time = time.monotonic()
+        self.watchdog_triggered = False
+
+        # Watchdog timer - runs at 10Hz to check for command timeouts
+        self.watchdog_timer = self.create_timer(0.1, self.watchdog_callback)
+
+        # Error tracking
+        self.consecutive_errors = 0
+        self.max_consecutive_errors = 5
+
         self.get_logger().info('Servo bus node initialized')
 
     def drive_cmd_callback(self, msg: Float64MultiArray):
@@ -104,11 +120,25 @@ class ServoBusNode(Node):
             return
 
         self.drive_velocities = list(msg.data[:6])
+        self.last_drive_cmd_time = time.monotonic()
+
+        # Reset watchdog if it was triggered
+        if self.watchdog_triggered:
+            self.watchdog_triggered = False
+            self.get_logger().info('Watchdog reset - commands resumed')
 
         # Send to servos (velocity in percent -100 to 100)
+        errors = 0
         for i, servo_id in enumerate(SawppyServos.ALL_DRIVE):
             velocity = self.drive_velocities[i]
-            self.driver.spin(servo_id, velocity)
+            if not self.driver.spin(servo_id, velocity):
+                errors += 1
+                self.get_logger().warning(
+                    f'Failed to send drive command to servo {servo_id}',
+                    throttle_duration_sec=1.0
+                )
+
+        self._update_error_count(errors)
 
     def steer_cmd_callback(self, msg: Float64MultiArray):
         """Handle steering position commands."""
@@ -117,11 +147,54 @@ class ServoBusNode(Node):
             return
 
         self.steer_angles = list(msg.data[:4])
+        self.last_steer_cmd_time = time.monotonic()
 
         # Send to servos (angle in degrees -120 to 120)
+        errors = 0
         for i, servo_id in enumerate(SawppyServos.ALL_STEER):
             angle = self.steer_angles[i]
-            self.driver.move_to(servo_id, angle)
+            if not self.driver.move_to(servo_id, angle):
+                errors += 1
+                self.get_logger().warning(
+                    f'Failed to send steer command to servo {servo_id}',
+                    throttle_duration_sec=1.0
+                )
+
+        self._update_error_count(errors)
+
+    def _update_error_count(self, errors: int):
+        """Track consecutive errors and warn if threshold exceeded."""
+        if errors > 0:
+            self.consecutive_errors += errors
+            if self.consecutive_errors >= self.max_consecutive_errors:
+                self.get_logger().error(
+                    f'High error rate: {self.consecutive_errors} consecutive servo errors',
+                    throttle_duration_sec=5.0
+                )
+        else:
+            self.consecutive_errors = 0
+
+    def watchdog_callback(self):
+        """Check for command timeout and stop motors if no recent commands."""
+        now = time.monotonic()
+        drive_timeout = (now - self.last_drive_cmd_time) > WATCHDOG_TIMEOUT_SEC
+
+        if drive_timeout and not self.watchdog_triggered:
+            # No drive commands received recently - stop all motors
+            self.watchdog_triggered = True
+            self.get_logger().warning(
+                f'Watchdog triggered - no drive commands for {WATCHDOG_TIMEOUT_SEC}s, stopping motors'
+            )
+            self._emergency_stop()
+
+    def _emergency_stop(self):
+        """Emergency stop all drive motors."""
+        self.drive_velocities = [0.0] * 6
+        for servo_id in SawppyServos.ALL_DRIVE:
+            if not self.driver.spin(servo_id, 0):
+                self.get_logger().error(
+                    f'Failed to stop servo {servo_id} during emergency stop'
+                )
 
     def timer_callback(self):
         """Publish joint states."""
@@ -159,14 +232,27 @@ class ServoBusNode(Node):
         """Shutdown node and stop all servos."""
         self.get_logger().info('Shutting down, stopping all servos...')
 
+        # Cancel timers
+        self.watchdog_timer.cancel()
+        self.timer.cancel()
+
         # Stop all drive motors
+        errors = 0
         for servo_id in SawppyServos.ALL_DRIVE:
-            self.driver.spin(servo_id, 0)
-            self.driver.set_servo_mode(servo_id)
+            if not self.driver.spin(servo_id, 0):
+                errors += 1
+            if not self.driver.set_servo_mode(servo_id):
+                errors += 1
 
         # Center all steering
         for servo_id in SawppyServos.ALL_STEER:
-            self.driver.move_to(servo_id, 0)
+            if not self.driver.move_to(servo_id, 0):
+                errors += 1
+
+        if errors > 0:
+            self.get_logger().warning(f'Shutdown completed with {errors} servo errors')
+        else:
+            self.get_logger().info('All servos stopped successfully')
 
         self.driver.close()
 
