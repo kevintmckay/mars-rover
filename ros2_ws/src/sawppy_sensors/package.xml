@@ -3,7 +3,7 @@
 <package format="3">
   <name>sawppy_sensors</name>
   <version>0.1.0</version>
-  <description>Sensor configurations and launch files for Sawppy rover (RPLidar, RealSense, BNO055)</description>
+  <description>Sensor configurations and launch files for Sawppy rover (RPLidar, OAK-D Lite, BNO055, VL53L0X)</description>
   <maintainer email="kevin@example.com">Kevin</maintainer>
   <license>MIT</license>
 
@@ -13,7 +13,7 @@
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
   <exec_depend>rplidar_ros</exec_depend>
-  <exec_depend>realsense2_camera</exec_depend>
+  <exec_depend>depthai_ros</exec_depend>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

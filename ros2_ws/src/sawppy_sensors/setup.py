@@ -24,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'bno055_node = sawppy_sensors.bno055_node:main',
+            'imu_publisher = sawppy_sensors.imu_publisher:main',
+            'tof_publisher = sawppy_sensors.tof_publisher:main',
         ],
     },
 )
