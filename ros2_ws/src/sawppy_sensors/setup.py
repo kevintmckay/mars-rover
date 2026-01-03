@@ -19,6 +19,7 @@ setup(
         'setuptools',
         'adafruit-blinka',
         'adafruit-circuitpython-bno055',
+        'adafruit-extended-bus',
         'vl53l0x',
     ],
     zip_safe=True,

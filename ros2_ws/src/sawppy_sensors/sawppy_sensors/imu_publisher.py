@@ -12,6 +12,8 @@ Parameters:
     simulate (bool): Run without hardware (default: false)
     publish_rate (float): Publishing frequency in Hz (default: 50.0)
     frame_id (str): TF frame ID for IMU (default: 'imu_link')
+    i2c_bus (int): I2C bus number (default: 1, Pi 5 also has bus 3)
+    i2c_address (int): I2C address of BNO055 (default: 0x28, alt: 0x29)
 """
 
 import rclpy
@@ -20,12 +22,27 @@ from sensor_msgs.msg import Imu
 
 # Hardware imports with fallback
 try:
+    import adafruit_bno055
+    HAS_BNO055 = True
+except ImportError:
+    HAS_BNO055 = False
+
+try:
+    # Try extended bus first (allows specifying bus number)
+    from adafruit_extended_bus import ExtendedI2C
+    HAS_EXTENDED_BUS = True
+except ImportError:
+    HAS_EXTENDED_BUS = False
+
+try:
+    # Fallback to standard Blinka
     import board
     import busio
-    import adafruit_bno055
-    HAS_HARDWARE = True
+    HAS_BLINKA = True
 except ImportError:
-    HAS_HARDWARE = False
+    HAS_BLINKA = False
+
+HAS_HARDWARE = HAS_BNO055 and (HAS_EXTENDED_BUS or HAS_BLINKA)
 
 
 class IMUPublisherNode(Node):
@@ -38,20 +55,26 @@ class IMUPublisherNode(Node):
         self.declare_parameter('simulate', False)
         self.declare_parameter('publish_rate', 50.0)
         self.declare_parameter('frame_id', 'imu_link')
+        self.declare_parameter('i2c_bus', 1)
+        self.declare_parameter('i2c_address', 0x28)
 
         # Get parameters
         self.simulate = self.get_parameter('simulate').value or not HAS_HARDWARE
         self.publish_rate = self.get_parameter('publish_rate').value
         self.frame_id = self.get_parameter('frame_id').value
+        self.i2c_bus = self.get_parameter('i2c_bus').value
+        self.i2c_address = self.get_parameter('i2c_address').value
 
         # Initialize hardware
         self.imu = None
         if not self.simulate:
             try:
-                i2c = busio.I2C(board.SCL, board.SDA)
-                self.imu = adafruit_bno055.BNO055_I2C(i2c)
+                i2c = self._create_i2c_bus(self.i2c_bus)
+                self.imu = adafruit_bno055.BNO055_I2C(i2c, address=self.i2c_address)
                 # Wait for calibration status
-                self.get_logger().info(f'BNO055 initialized at 0x28')
+                self.get_logger().info(
+                    f'BNO055 initialized on bus {self.i2c_bus} at 0x{self.i2c_address:02X}'
+                )
                 self.get_logger().info(f'Calibration status: sys={self.imu.calibration_status[0]}, '
                                        f'gyro={self.imu.calibration_status[1]}, '
                                        f'accel={self.imu.calibration_status[2]}, '
@@ -70,6 +93,33 @@ class IMUPublisherNode(Node):
         self.timer = self.create_timer(1.0 / self.publish_rate, self.publish_imu)
 
         self.get_logger().info(f'IMU publisher ready at {self.publish_rate} Hz')
+
+    def _create_i2c_bus(self, bus_num: int):
+        """
+        Create I2C bus object for the specified bus number.
+
+        Args:
+            bus_num: I2C bus number (1 is default on Pi, 3 also available on Pi 5)
+
+        Returns:
+            I2C bus object compatible with adafruit libraries
+        """
+        # Prefer ExtendedI2C if available (supports any bus number)
+        if HAS_EXTENDED_BUS:
+            self.get_logger().info(f'Using ExtendedI2C for bus {bus_num}')
+            return ExtendedI2C(bus_num)
+
+        # Fall back to standard Blinka (only supports default bus)
+        if HAS_BLINKA:
+            if bus_num != 1:
+                self.get_logger().warning(
+                    f'Bus {bus_num} requested but only bus 1 supported without '
+                    'adafruit-extended-bus package. Falling back to bus 1.'
+                )
+            self.get_logger().info('Using standard Blinka I2C')
+            return busio.I2C(board.SCL, board.SDA)
+
+        raise RuntimeError('No I2C library available')
 
     def publish_imu(self):
         """Read IMU and publish data."""
