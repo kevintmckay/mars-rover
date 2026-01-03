@@ -12,6 +12,7 @@
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
+  <depend>diagnostic_msgs</depend>
   <exec_depend>rplidar_ros</exec_depend>
   <exec_depend>depthai_ros</exec_depend>
 

@@ -26,6 +26,7 @@ setup(
         'console_scripts': [
             'imu_publisher = sawppy_sensors.imu_publisher:main',
             'tof_publisher = sawppy_sensors.tof_publisher:main',
+            'thermal_monitor = sawppy_sensors.thermal_monitor:main',
         ],
     },
 )
